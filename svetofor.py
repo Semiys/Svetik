@@ -166,3 +166,8 @@ canvas.bind("<Configure>", update_canvas)
 
 # Запуск главного цикла программы
 root.mainloop()
+
+
+
+
+
