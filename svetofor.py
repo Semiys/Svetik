@@ -20,6 +20,7 @@ menu_frame.pack(side="left", fill="y")
 
 # Переменные для таймера и состояния светофора
 pedestrian_light_state = "red"
+driver_light_state = "green"
 timer_value = 0
 timer_text_id = None
 waiting_for_green = False
@@ -33,13 +34,10 @@ last_update_time = 0
 # Функции для кнопок
 def start_simulation():
     global timer_running, simulation_started, last_update_time
-    if simulation_started:
-        messagebox.showinfo("Внимание", "Для перезапуска симуляции необходимо сначала закончить текущую и начать новую")
-        return
     timer_running = True
     simulation_started = True
     last_update_time = time.time()
-    update_pedestrian_light()
+    update_lights()
     print("Симуляция начата")
 
 
@@ -59,18 +57,19 @@ def resume_simulation():
         return
     timer_running = True
     last_update_time = time.time()
-    update_pedestrian_light()
+    update_lights()
     print("Симуляция продолжается")
 
 
 def stop_simulation():
-    global timer_running, pedestrian_light_state, timer_value, waiting_for_green, simulation_started
+    global timer_running, pedestrian_light_state, driver_light_state, timer_value, waiting_for_green, simulation_started
     timer_running = False
     simulation_started = False
     pedestrian_light_state = "red"
+    driver_light_state = "green"
     timer_value = 0
     waiting_for_green = False
-    update_pedestrian_light()
+    update_lights()
     print("Симуляция завершена")
 
 
@@ -94,6 +93,7 @@ def open_settings():
         green_duration = int(green_entry.get())
         red_duration = int(red_entry.get())
         settings_window.destroy()
+        messagebox.showinfo("Настройки сохранены", "Для применения новых настроек необходимо перезапустить симуляцию")
 
     tk.Button(settings_window, text="Сохранить", command=save_settings).grid(row=2, column=0, columnspan=2, pady=10)
 
@@ -164,12 +164,12 @@ def start_pedestrian_timer():
     if pedestrian_light_state == "red" and not waiting_for_green and timer_running:
         waiting_for_green = True
         timer_value = red_duration
-        update_pedestrian_light()
+        update_lights()
 
 
-def update_pedestrian_light():
-    global timer_value, pedestrian_light_state, timer_text_id, waiting_for_green, timer_running, last_update_time
-    canvas.delete("pedestrian_light")
+def update_lights():
+    global timer_value, pedestrian_light_state, driver_light_state, timer_text_id, waiting_for_green, timer_running, last_update_time
+    canvas.delete("pedestrian_light", "driver_light")
 
     current_time = time.time()
     elapsed_time = current_time - last_update_time
@@ -180,10 +180,13 @@ def update_pedestrian_light():
                            pedestrian_light_y + 40, fill="red", tags="pedestrian_light")
         if waiting_for_green and timer_running:
             timer_value -= elapsed_time
+            if timer_value <= 3:
+                driver_light_state = "yellow"
             if timer_value <= 0:
                 pedestrian_light_state = "green"
+                driver_light_state = "red"
                 timer_value = green_duration
-                canvas.delete("pedestrian_light")  # Удаляем красный сигнал
+                canvas.delete("pedestrian_light")
                 canvas.create_oval(pedestrian_light_x + 115, pedestrian_light_y + 5, pedestrian_light_x + 150,
                                    pedestrian_light_y + 40, fill="green", tags="pedestrian_light")
     elif pedestrian_light_state == "green":
@@ -193,8 +196,12 @@ def update_pedestrian_light():
             timer_value -= elapsed_time
             if timer_value <= 0:
                 pedestrian_light_state = "red"
+                driver_light_state = "green"
                 timer_value = 0
                 waiting_for_green = False
+
+    # Обновляем светофоры для водителей
+    draw_driver_lights()
 
     if timer_running or pedestrian_light_state == "green":
         color = "green" if pedestrian_light_state == "green" else "red"
@@ -208,9 +215,10 @@ def update_pedestrian_light():
             canvas.itemconfigure(timer_text_id, text=f"{timer_value:.1f}")
 
     if timer_running:
-        canvas.after(100, update_pedestrian_light)
+        canvas.after(100, update_lights)
     else:
         pedestrian_light_state = "red"
+        driver_light_state = "green"
         canvas.create_oval(pedestrian_light_x + 5, pedestrian_light_y + 5, pedestrian_light_x + 40,
                            pedestrian_light_y + 40, fill="red", tags="pedestrian_light")
         canvas.create_oval(pedestrian_light_x + 115, pedestrian_light_y + 5, pedestrian_light_x + 150,
@@ -227,33 +235,44 @@ pedestrian_button.pack()
 
 # Функция для отрисовки светофоров
 def draw_traffic_lights():
-    global pedestrian_light_x, pedestrian_light_y
+    global pedestrian_light_x, pedestrian_light_y, driver_light_x_left, driver_light_x_right, driver_light_y
 
     canvas_width = canvas.winfo_width()
     canvas_height = canvas.winfo_height()
 
-    driver_light_y = canvas_height // 2 - 180
+    driver_light_y = canvas_height // 2 - 40
     line_y = canvas_height // 2
     driver_light_x_left = canvas_width // 2 - 170
     driver_light_x_right = canvas_width // 2 + 160
 
-    canvas.create_rectangle(driver_light_x_left, line_y - 45, driver_light_x_left + 30, line_y + 45, fill="black")
-    canvas.create_rectangle(driver_light_x_right, line_y - 45, driver_light_x_right + 30, line_y + 45, fill="black")
+    canvas.create_rectangle(driver_light_x_left, driver_light_y, driver_light_x_left + 30, driver_light_y + 90,
+                            fill="black")
+    canvas.create_rectangle(driver_light_x_right, driver_light_y, driver_light_x_right + 30, driver_light_y + 90,
+                            fill="black")
 
     pedestrian_light_x = canvas_width // 2 - 60
-    pedestrian_light_y = line_y - 30  # Размещаем горизонтальный светофор
+    pedestrian_light_y = line_y - 30
     canvas.create_rectangle(pedestrian_light_x, pedestrian_light_y, pedestrian_light_x + 155, pedestrian_light_y + 45,
                             fill="black")
 
     # Рисуем световые сигналы для пешеходов
-    canvas.create_oval(pedestrian_light_x + 10, pedestrian_light_y + 10, pedestrian_light_x + 50,
+    canvas.create_oval(pedestrian_light_x + 5, pedestrian_light_y + 5, pedestrian_light_x + 40,
                        pedestrian_light_y + 40, fill="red", tags="pedestrian_light")
-    canvas.create_oval(pedestrian_light_x + 70, pedestrian_light_y + 10, pedestrian_light_x + 110,
+    canvas.create_oval(pedestrian_light_x + 115, pedestrian_light_y + 5, pedestrian_light_x + 150,
                        pedestrian_light_y + 40, fill="black", tags="pedestrian_light")
-    canvas.create_oval(pedestrian_light_x + 130, pedestrian_light_y + 10, pedestrian_light_x + 150,
-                       pedestrian_light_y + 40, fill="green", tags="pedestrian_light")
 
-    update_pedestrian_light()  # Запускаем обновление состояния светофора
+    draw_driver_lights()
+
+
+def draw_driver_lights():
+    # Рисуем световые сигналы для водителей
+    for x in [driver_light_x_left, driver_light_x_right]:
+        canvas.create_oval(x + 5, driver_light_y + 5, x + 25, driver_light_y + 25,
+                           fill="red" if driver_light_state == "red" else "black", tags="driver_light")
+        canvas.create_oval(x + 5, driver_light_y + 35, x + 25, driver_light_y + 55,
+                           fill="yellow" if driver_light_state == "yellow" else "black", tags="driver_light")
+        canvas.create_oval(x + 5, driver_light_y + 65, x + 25, driver_light_y + 85,
+                           fill="green" if driver_light_state == "green" else "black", tags="driver_light")
 
 
 # Функция для обновления размеров при изменении размера окна
@@ -271,6 +290,7 @@ canvas.bind("<Configure>", update_canvas)
 draw_road()
 draw_crosswalk()
 draw_traffic_lights()
+
 
 
 
