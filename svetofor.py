@@ -120,23 +120,69 @@ def draw_crosswalk():
     canvas.create_line(left_stop_line_x, crosswalk_start_y, left_stop_line_x, crosswalk_end_y, fill="white", width=5)
     canvas.create_line(right_stop_line_x, crosswalk_start_y, right_stop_line_x, crosswalk_end_y, fill="white", width=5)
 
-# Рисуем светофоры
+
+# Переменные для таймера
+pedestrian_light_state = "red"  # Начальное состояние светофора для пешеходов
+timer_value = 20  # Количество секунд до смены сигнала
+
+
+def start_pedestrian_timer():
+    global pedestrian_light_state, timer_value
+    if pedestrian_light_state == "red":
+        pedestrian_light_state = "green"
+        timer_value = 20  # Устанавливаем таймер на 10 секунд
+        update_pedestrian_light()  # Обновляем отображение светофора
+
+
+def update_pedestrian_light():
+    global timer_value, pedestrian_light_state
+    canvas.delete("pedestrian_light")  # Удаляем старое состояние
+
+    # Отрисовка светофора для пешеходов
+    if pedestrian_light_state == "green":
+        canvas.create_oval(pedestrian_light_x_left + 5, pedestrian_light_y + 5, pedestrian_light_x_left + 25,
+                           pedestrian_light_y + 25,
+                           fill="green", tags="pedestrian_light")
+        timer_value -= 1
+        if timer_value <= 0:
+            pedestrian_light_state = "red"
+            timer_value = 10
+    else:
+        canvas.create_oval(pedestrian_light_x_left + 5, pedestrian_light_y + 60, pedestrian_light_x_left + 25,
+                           pedestrian_light_y + 80,
+                           fill="red", tags="pedestrian_light")
+
+    # Запускаем таймер через 1 секунду
+    canvas.after(1000, update_pedestrian_light)
+
+
+# Добавляем кнопку для пешеходного светофора
+button_frame = tk.Frame(menu_frame)
+button_frame.pack(pady=20)
+
+pedestrian_button = tk.Button(button_frame, text="Переключить пешеходный свет", command=start_pedestrian_timer)
+pedestrian_button.pack()
+
+
+# Функция для отрисовки светофоров
 def draw_traffic_lights():
+    global pedestrian_light_x_left, pedestrian_light_y
+
     canvas_width = canvas.winfo_width()
     canvas_height = canvas.winfo_height()
 
-    # Высота размещения светофоров для водителей (по центру дороги)
+    # Высота размещения светофоров для водителей
     driver_light_y = canvas_height // 2 - 180
-    line_y = canvas_height // 2  # Центр разделительной полосы
+    line_y = canvas_height // 2
 
-    # Светофоры для водителей слева и справа от пешеходного перехода
+    # Светофоры для водителей (слева и справа)
     driver_light_x_left = canvas_width // 2 - 170
     driver_light_x_right = canvas_width // 2 + 160
 
     canvas.create_rectangle(driver_light_x_left, line_y - 45, driver_light_x_left + 30, line_y + 45, fill="black")
     canvas.create_rectangle(driver_light_x_right, line_y - 45, driver_light_x_right + 30, line_y + 45, fill="black")
 
-    # Светофоры для пешеходов
+    # Светофоры для пешеходов (слева и справа)
     pedestrian_light_x_left = canvas_width // 2 - 160
     pedestrian_light_y = canvas_height // 2 - 250
     pedestrian_light_x_right = canvas_width // 2 + 150
@@ -146,6 +192,8 @@ def draw_traffic_lights():
                             pedestrian_light_y + 90, fill="black")
     canvas.create_rectangle(pedestrian_light_x_right, pedestrian_light_y_bottom, pedestrian_light_x_right + 30,
                             pedestrian_light_y_bottom + 90, fill="black")
+
+    update_pedestrian_light()  # Обновляем состояние светофоров для пешеходов
 
 # Функция для обновления размеров при изменении размера окна
 def update_canvas(event):
