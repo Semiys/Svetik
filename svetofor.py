@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import simpledialog, messagebox
+from tkinter import simpledialog, messagebox, PhotoImage
 import time
 from PIL import Image, ImageTk
 import random
@@ -39,6 +39,12 @@ car_speed = 21  # пикселей за кадр
 car_spawn_interval = 1  # секунды между появлением новых машин
 last_car_spawn_time = 0
 
+# Переменные для пешеходов
+pedestrians = []
+pedestrian_spawn_interval = 5  # секунды между появлением новых пешеходов
+last_pedestrian_spawn_time = 0
+max_pedestrians = 7  # Максимальное количество пешеходов
+
 # Загрузка изображений машин
 for i in range(1, 5):  # Увеличим количество изображений машин
     image = Image.open(f"car{i}.png")
@@ -75,7 +81,7 @@ class Car:
     def is_at_stop_line(self):
         canvas_width = self.canvas.winfo_width()
         if self.direction == "left":
-            stop_line_x = canvas_width // 2 + 225 # Изменено положение стоп-линии для верхней полосы
+            stop_line_x = canvas_width // 2 + 225  # Изменено положение стоп-линии для верхней полосы
             return self.x <= stop_line_x
         else:  # direction == "right"
             stop_line_x = canvas_width // 2 - 170  # Изменено положение стоп-линии для нижней полосы
@@ -100,19 +106,112 @@ class Car:
         crosswalk_end = canvas_width // 2 + 150
         return crosswalk_start <= self.x <= crosswalk_end or crosswalk_start <= self.x + 250 <= crosswalk_end
 
+    def is_near_pedestrian(self, pedestrians):
+        for pedestrian in pedestrians:
+            if self.direction == "left":
+                if (self.x - pedestrian.x < 100 and self.x > pedestrian.x) and abs(self.y - pedestrian.y) < 50:
+                    return True
+            else:
+                if (pedestrian.x - (self.x + 250) < 100 and self.x < pedestrian.x) and abs(self.y - pedestrian.y) < 50:
+                    return True
+        return False
+
+
+class Pedestrian:
+    def __init__(self, canvas, image_path, x, y):
+        self.canvas = canvas
+        self.image = PhotoImage(file=image_path)
+        self.image = self.image.subsample(10, 10)  # Уменьшаем размер изображений
+        self.id = canvas.create_image(x, y, image=self.image)
+        self.x = x
+        self.y = y
+        self.state = "walking_to_crosswalk"
+        self.target_y = canvas.winfo_height() // 2 + road_height // 2 + 20  # Целевая позиция чуть ниже перехода
+        self.crosswalk_center_y = canvas.winfo_height() // 2
+        self.normal_speed = 2
+        self.crossing_speed = self.normal_speed
+        self.current_speed = self.normal_speed
+        self.acceleration = 0.1  # Ускорение для плавного изменения скорости
+        self.x_offset = random.uniform(-0.5, 0.5)  # Случайное отклонение по горизонтали
+        self.relaxed_speed = self.normal_speed * 0.7  # Скорость для спокойного перехода
+        self.hurry_threshold = 5  # Порог времени, когда нужно начинать торопиться
+
+    def move(self):
+        global timer_value, pedestrian_light_state
+        if self.state == "walking_to_crosswalk":
+            if self.y > self.target_y:
+                self.current_speed = min(self.current_speed + self.acceleration, self.normal_speed)
+                self.canvas.move(self.id, self.x_offset, -self.current_speed)
+                self.x += self.x_offset
+                self.y -= self.current_speed
+            else:
+                self.state = "waiting_at_crosswalk"
+                self.current_speed = 0
+        elif self.state == "waiting_at_crosswalk":
+            if pedestrian_light_state == "green" and timer_value > 2:
+                self.state = "crossing_road"
+                distance_to_cross = road_height
+                self.crossing_speed = distance_to_cross / (green_duration * 10)
+        elif self.state == "crossing_road":
+            if self.y > self.crosswalk_center_y - road_height // 2:
+                if timer_value > self.hurry_threshold:
+                    # Идем спокойно, если времени достаточно
+                    self.current_speed = min(self.current_speed + self.acceleration, self.relaxed_speed)
+                elif timer_value <= self.hurry_threshold:
+                    # Ускоряемся, когда времени мало
+                    self.current_speed = min(self.current_speed + self.acceleration * 2, self.crossing_speed * 1.5)
+                self.canvas.move(self.id, 0, -self.current_speed)
+                self.y -= self.current_speed
+            else:
+                self.state = "leaving_scene"
+                self.current_speed = self.normal_speed
+        elif self.state == "leaving_scene":
+            if self.y > 0:
+                # Плавно замедляемся после перехода дороги
+                target_speed = self.normal_speed * 0.5
+                if self.current_speed > target_speed:
+                    self.current_speed = max(self.current_speed - self.acceleration, target_speed)
+                self.canvas.move(self.id, self.x_offset, -self.current_speed)
+                self.x += self.x_offset
+                self.y -= self.current_speed
+            else:
+                self.state = "crossed"
+
+
+def load_pedestrian_models(canvas):
+    global pedestrians, last_pedestrian_spawn_time
+    pedestrians = []  # Очищаем список пешеходов перед загрузкой новых
+    models = ["model1.png", "model2.png", "model3.png"]
+    crosswalk_start = canvas.winfo_width() // 2 - 130
+    crosswalk_end = canvas.winfo_width() // 2 + 150
+    crosswalk_width = crosswalk_end - crosswalk_start
+
+    # Вычисляем расстояние между пешеходами
+    spacing = crosswalk_width // (len(models) + 1)
+
+    for i, model in enumerate(models, 1):
+        x = crosswalk_start + i * spacing
+        y = canvas.winfo_height() + 50 + i * 50  # Начинаем ниже нижней границы экрана, с разной высотой
+        pedestrian = Pedestrian(canvas, model, x, y)
+        pedestrians.append(pedestrian)
+
+    last_pedestrian_spawn_time = time.time()
+
 
 # Функции для кнопок
 def start_simulation():
-    global timer_running, simulation_started, last_update_time, last_car_spawn_time
+    global timer_running, simulation_started, last_update_time, last_car_spawn_time, pedestrians
     if simulation_started:
         return  # Если симуляция уже запущена, ничего не делаем
     timer_running = True
     simulation_started = True
     last_update_time = time.time()
     last_car_spawn_time = time.time()
+    load_pedestrian_models(canvas)  # Загружаем пешеходов при старте симуляции
     update_lights()
     move_cars()
     spawn_cars()
+    spawn_pedestrians()
     print("Симуляция начата")
 
 
@@ -137,11 +236,12 @@ def resume_simulation():
     update_lights()
     move_cars()
     spawn_cars()
+    spawn_pedestrians()
     print("Симуляция продолжается")
 
 
 def stop_simulation():
-    global timer_running, pedestrian_light_state, driver_light_state, timer_value, waiting_for_green, simulation_started, cars
+    global timer_running, pedestrian_light_state, driver_light_state, timer_value, waiting_for_green, simulation_started, cars, pedestrians
     timer_running = False
     simulation_started = False
     pedestrian_light_state = "red"
@@ -152,6 +252,9 @@ def stop_simulation():
     for car in cars:
         canvas.delete(car.id)
     cars = []
+    for pedestrian in pedestrians:
+        canvas.delete(pedestrian.id)
+    pedestrians = []
     print("Симуляция завершена")
 
 
@@ -174,6 +277,11 @@ def open_settings():
         global green_duration, red_duration
         green_duration = int(green_entry.get())
         red_duration = int(red_entry.get())
+        # Обновляем скорость пешеходов
+        for pedestrian in pedestrians:
+            if pedestrian.state == "crossing_road":
+                distance_to_cross = road_height
+                pedestrian.speed = distance_to_cross / (green_duration * 10)
         settings_window.destroy()
         messagebox.showinfo("Настройки сохранены", "Для применения новых настроек необходимо перезапустить симуляцию")
 
@@ -287,6 +395,13 @@ def update_lights():
     # Обновляем светофоры для водителей
     draw_driver_lights()
 
+    # Обновляем пешеходов
+    for pedestrian in pedestrians:
+        if pedestrian_light_state == "green" and pedestrian.y <= pedestrian.target_y:
+            pedestrian.waiting = False
+        pedestrian.move()
+    pedestrians[:] = [p for p in pedestrians if p.state != "crossed"]
+
     if timer_running or pedestrian_light_state == "green":
         color = "green" if pedestrian_light_state == "green" else "red"
         if timer_text_id is None:
@@ -382,6 +497,8 @@ def update_canvas(event):
     draw_road()
     draw_crosswalk()
     draw_traffic_lights()
+    if simulation_started:
+        load_pedestrian_models(canvas)
 
 
 # Привязываем функцию обновления к изменению размеров окна
@@ -400,13 +517,15 @@ def spawn_cars():
 
         # Спавн машины на верхней полосе (движение влево)
         if len([car for car in cars if car.direction == "left"]) < 3:
-            random_car_index = random.randint(0, len(car_images) // 2 - 1) * 2 + 1  # Выбираем случайную машину для левой полосы
+            random_car_index = random.randint(0,
+                                              len(car_images) // 2 - 1) * 2 + 1  # Выбираем случайную машину для левой полосы
             new_car = Car(canvas, canvas_width, canvas_height // 2 - 125, "left", car_images[random_car_index])
             cars.append(new_car)
 
         # Спавн машины на нижней полосе (движение вправо)
         if len([car for car in cars if car.direction == "right"]) < 3:
-            random_car_index = random.randint(0, len(car_images) // 2 - 1) * 2  # Выбираем случайную машину для правой полосы
+            random_car_index = random.randint(0,
+                                              len(car_images) // 2 - 1) * 2  # Выбираем случайную машину для правой полосы
             new_car = Car(canvas, -250, canvas_height // 2 + 50, "right", car_images[random_car_index])
             cars.append(new_car)
 
@@ -416,18 +535,50 @@ def spawn_cars():
         canvas.after(1000, spawn_cars)
 
 
+def spawn_pedestrians():
+    global last_pedestrian_spawn_time, pedestrians
+    if not simulation_started or not timer_running:
+        return
+
+    current_time = time.time()
+    if current_time - last_pedestrian_spawn_time >= pedestrian_spawn_interval and len(pedestrians) < max_pedestrians:
+        canvas_width = canvas.winfo_width()
+        canvas_height = canvas.winfo_height()
+
+        models = ["model1.png", "model2.png", "model3.png"]
+        crosswalk_start = canvas_width // 2 - 130
+        crosswalk_end = canvas_width // 2 + 150
+
+        x = random.randint(crosswalk_start, crosswalk_end)
+        y = canvas_height + 50
+
+        model = random.choice(models)
+        new_pedestrian = Pedestrian(canvas, model, x, y)
+        pedestrians.append(new_pedestrian)
+
+        last_pedestrian_spawn_time = current_time
+
+    if timer_running:
+        canvas.after(1000, spawn_pedestrians)
+
+
 def move_cars():
     if not simulation_started or not timer_running:
         return
 
     for car in cars:
         if not car.is_on_crosswalk():
-            if driver_light_state == "red" and car.is_at_stop_line() and not car.is_past_stop_line():
+            if (driver_light_state in ["red",
+                                       "yellow"] and car.is_at_stop_line() and not car.is_past_stop_line()) or car.is_near_pedestrian(
+                    pedestrians):
                 car.stop()
             elif driver_light_state == "green" or car.is_past_stop_line():
                 car.resume()
         else:
-            car.resume()  # Машина на пешеходном переходе всегда движется
+            if car.is_near_pedestrian(pedestrians):
+                car.stop()
+            else:
+                car.resume()
 
         car.move()
 
@@ -443,8 +594,9 @@ def move_cars():
                         car.stop()
                         break
         else:
-            if not car.is_at_stop_line() or driver_light_state == "green" or car.is_on_crosswalk():
-                car.resume()
+            if not car.is_at_stop_line() and not car.is_near_pedestrian(pedestrians):
+                if driver_light_state == "green" or car.is_on_crosswalk():
+                    car.resume()
 
     # Удаление машин, выехавших за пределы экрана
     cars[:] = [car for car in cars if not car.is_off_screen()]
