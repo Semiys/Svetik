@@ -304,6 +304,9 @@ def open_settings():
 
     tk.Button(settings_window, text="Сохранить", command=save_settings).grid(row=2, column=0, columnspan=2, pady=10)
 
+def exit_application():
+    if messagebox.askokcancel("Выход", "Вы уверены, что хотите выйти?"):
+        root.quit()
 
 # Кнопки в меню
 buttons = {
@@ -312,6 +315,7 @@ buttons = {
     "Продолжить": resume_simulation,
     "Закончить симуляцию": stop_simulation,
     "Настройки": open_settings,
+    "Выход": exit_application,
 }
 
 # Создаем и размещаем кнопки
