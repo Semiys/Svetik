@@ -3,6 +3,14 @@ from tkinter import simpledialog, messagebox, PhotoImage
 import time
 from PIL import Image, ImageTk
 import random
+import pygame  # Добавляем импорт pygame для работы со звуком
+
+# Инициализация pygame для работы со звуком
+pygame.mixer.init()
+
+# Загрузка звукового файла
+sound = pygame.mixer.Sound("sound.mp3")
+sound.set_volume(0.1)  # Устанавливаем уровень громкости на 30%
 
 # Создаем главное окно
 root = tk.Tk()
@@ -255,6 +263,7 @@ def stop_simulation():
     for pedestrian in pedestrians:
         canvas.delete(pedestrian.id)
     pedestrians = []
+    sound.stop()  # Останавливаем звук при завершении симуляции
     print("Симуляция завершена")
 
 
@@ -275,15 +284,23 @@ def open_settings():
 
     def save_settings():
         global green_duration, red_duration
-        green_duration = int(green_entry.get())
-        red_duration = int(red_entry.get())
-        # Обновляем скорость пешеходов
-        for pedestrian in pedestrians:
-            if pedestrian.state == "crossing_road":
-                distance_to_cross = road_height
-                pedestrian.speed = distance_to_cross / (green_duration * 10)
-        settings_window.destroy()
-        messagebox.showinfo("Настройки сохранены", "Для применения новых настроек необходимо перезапустить симуляцию")
+        try:
+            new_green_duration = int(green_entry.get())
+            new_red_duration = int(red_entry.get())
+            if new_green_duration <= 0 or new_red_duration <= 0:
+                raise ValueError("Значения должны быть положительными")
+            green_duration = new_green_duration
+            red_duration = new_red_duration
+            # Обновляем скорость пешеходов
+            for pedestrian in pedestrians:
+                if pedestrian.state == "crossing_road":
+                    distance_to_cross = road_height
+                    pedestrian.speed = distance_to_cross / (green_duration * 10)
+            settings_window.destroy()
+            messagebox.showinfo("Настройки сохранены",
+                                "Для применения новых настроек необходимо перезапустить симуляцию")
+        except ValueError:
+            messagebox.showerror("Ошибка", "Пожалуйста, введите положительные целые числа (отличные от нуля)")
 
     tk.Button(settings_window, text="Сохранить", command=save_settings).grid(row=2, column=0, columnspan=2, pady=10)
 
@@ -305,6 +322,7 @@ for btn_text, func in buttons.items():
 # Поле для симуляции
 canvas = tk.Canvas(main_frame, bg="white")
 canvas.pack(side="right", fill="both", expand=True)
+
 
 
 # Создаем разметку дороги и перехода
@@ -382,6 +400,7 @@ def update_lights():
                 canvas.delete("pedestrian_light")
                 canvas.create_oval(pedestrian_light_x + 115, pedestrian_light_y + 5, pedestrian_light_x + 150,
                                    pedestrian_light_y + 40, fill="green", tags="pedestrian_light")
+                sound.play(loops=-1)  # Включаем звук при зеленом сигнале светофора
     elif pedestrian_light_state == "green":
         canvas.create_oval(pedestrian_light_x + 115, pedestrian_light_y + 5, pedestrian_light_x + 150,
                            pedestrian_light_y + 40, fill="green", tags="pedestrian_light")
@@ -392,6 +411,7 @@ def update_lights():
                 driver_light_state = "green"
                 timer_value = 0
                 waiting_for_green = False
+                sound.stop()  # Выключаем звук при красном сигнале светофора
 
     # Обновляем светофоры для водителей
     draw_driver_lights()
@@ -490,6 +510,7 @@ def draw_driver_lights():
 # Функция для обновления размеров при изменении размера окна
 def update_canvas(event):
     canvas.delete("all")
+
     draw_road()
     draw_crosswalk()
     draw_traffic_lights()
