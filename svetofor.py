@@ -61,7 +61,7 @@ class Car:
         self.y = y
         self.direction = direction
         self.image = image
-        self.id = canvas.create_image(x, y, image=image, anchor="nw")
+        self.id = canvas.create_image(x, y, image=image, anchor="nw", tags="car")
         self.stopped = False
 
     def move(self):
@@ -122,7 +122,7 @@ class Pedestrian:
         self.canvas = canvas
         self.image = PhotoImage(file=image_path)
         self.image = self.image.subsample(10, 10)  # Уменьшаем размер изображений
-        self.id = canvas.create_image(x, y, image=self.image)
+        self.id = canvas.create_image(x, y, image=self.image, tags="pedestrian")
         self.x = x
         self.y = y
         self.state = "walking_to_crosswalk"
@@ -314,8 +314,9 @@ def draw_road():
     road_y = canvas_height // 2
     global road_height
     road_height = 350
-    canvas.create_rectangle(0, road_y - road_height // 2, canvas_width, road_y + road_height // 2, fill="gray")
-    canvas.create_line(0, road_y, canvas_width, road_y, fill="white", dash=(20, 10))
+    canvas.create_rectangle(0, road_y - road_height // 2, canvas_width, road_y + road_height // 2, fill="gray",
+                            tags="road")
+    canvas.create_line(0, road_y, canvas_width, road_y, fill="white", dash=(20, 10), tags="road")
 
 
 def draw_crosswalk():
@@ -329,20 +330,20 @@ def draw_crosswalk():
     y = crosswalk_start_y
     while y < crosswalk_end_y:
         canvas.create_rectangle(crosswalk_x, y, crosswalk_x + crosswalk_width, min(y + 30, crosswalk_end_y),
-                                fill="yellow")
+                                fill="yellow", tags="crosswalk")
         y += 30
         if y < crosswalk_end_y:
             canvas.create_rectangle(crosswalk_x, y, crosswalk_x + crosswalk_width, min(y + 30, crosswalk_end_y),
-                                    fill="white")
+                                    fill="white", tags="crosswalk")
             y += 30
 
     stop_line_offset = 50
     left_stop_line_x = crosswalk_x - stop_line_offset
     right_stop_line_x = crosswalk_x + crosswalk_width + stop_line_offset
     canvas.create_line(left_stop_line_x, canvas_height // 2, left_stop_line_x, crosswalk_end_y, fill="white",
-                       width=5)  # Изменено положение левой стоп-линии
+                       width=5, tags="stop_line")  # Изменено положение левой стоп-линии
     canvas.create_line(right_stop_line_x, crosswalk_start_y, right_stop_line_x, canvas_height // 2, fill="white",
-                       width=5)  # Изменено положение правой стоп-линии
+                       width=5, tags="stop_line")  # Изменено положение правой стоп-линии
 
 
 def start_pedestrian_timer():
@@ -406,7 +407,7 @@ def update_lights():
         color = "green" if pedestrian_light_state == "green" else "red"
         if timer_text_id is None:
             timer_text_id = canvas.create_text(pedestrian_light_x + 75, pedestrian_light_y + 25,
-                                               text=f"{timer_value:.1f}", font=("Arial", 16), fill=color)
+                                               text=f"{timer_value:.1f}", font=("Arial", 16), fill=color, tags="timer")
         else:
             canvas.itemconfigure(timer_text_id, text=f"{timer_value:.1f}", fill=color)
     else:
@@ -429,11 +430,11 @@ def update_lights():
             canvas.create_oval(pedestrian_light_x + 115, pedestrian_light_y + 5, pedestrian_light_x + 150,
                                pedestrian_light_y + 40, fill="green", tags="pedestrian_light")
 
-    # Поднимаем светофор на передний план
+    # Устанавливаем порядок слоев
+    canvas.tag_raise("traffic_light")
+    canvas.tag_raise("timer")
     canvas.tag_raise("pedestrian_light")
     canvas.tag_raise("driver_light")
-    if timer_text_id is not None:
-        canvas.tag_raise(timer_text_id)
 
 
 # Добавляем кнопку для пешеходного светофора
@@ -474,11 +475,6 @@ def draw_traffic_lights():
 
     draw_driver_lights()
 
-    # Поднимаем светофор на передний план
-    canvas.tag_raise("traffic_light")
-    canvas.tag_raise("pedestrian_light")
-    canvas.tag_raise("driver_light")
-
 
 def draw_driver_lights():
     # Рисуем световые сигналы для водителей
@@ -499,6 +495,16 @@ def update_canvas(event):
     draw_traffic_lights()
     if simulation_started:
         load_pedestrian_models(canvas)
+
+    # Устанавливаем порядок слоев
+    canvas.tag_raise("stop_line")
+    canvas.tag_raise("crosswalk")
+    canvas.tag_raise("pedestrian")
+    canvas.tag_raise("car")
+    canvas.tag_raise("traffic_light")
+    canvas.tag_raise("timer")
+    canvas.tag_raise("pedestrian_light")
+    canvas.tag_raise("driver_light")
 
 
 # Привязываем функцию обновления к изменению размеров окна
@@ -570,7 +576,7 @@ def move_cars():
         if not car.is_on_crosswalk():
             if (driver_light_state in ["red",
                                        "yellow"] and car.is_at_stop_line() and not car.is_past_stop_line()) or car.is_near_pedestrian(
-                    pedestrians):
+                pedestrians):
                 car.stop()
             elif driver_light_state == "green" or car.is_past_stop_line():
                 car.resume()
