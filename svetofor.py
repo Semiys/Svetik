@@ -324,7 +324,7 @@ canvas = tk.Canvas(main_frame, bg="white")
 canvas.pack(side="right", fill="both", expand=True)
 
 # Загрузка фонового изображения
-background_image = Image.open("fon.jpg")
+background_image = Image.open("fon.png")
 background_photo = ImageTk.PhotoImage(background_image)
 
 
@@ -644,7 +644,6 @@ def move_cars():
 
     if timer_running:
         canvas.after(50, move_cars)
-
 
 # Рисуем все элементы
 draw_road()
