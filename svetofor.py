@@ -323,12 +323,19 @@ for btn_text, func in buttons.items():
 canvas = tk.Canvas(main_frame, bg="white")
 canvas.pack(side="right", fill="both", expand=True)
 
+# Загрузка фонового изображения
+background_image = Image.open("fon.jpg")
+background_photo = ImageTk.PhotoImage(background_image)
 
 
 # Создаем разметку дороги и перехода
 def draw_road():
     canvas_width = canvas.winfo_width()
     canvas_height = canvas.winfo_height()
+
+    # Отображаем фоновое изображение
+    canvas.create_image(0, 0, anchor="nw", image=background_photo, tags="background")
+
     road_y = canvas_height // 2
     global road_height
     road_height = 350
@@ -511,6 +518,11 @@ def draw_driver_lights():
 def update_canvas(event):
     canvas.delete("all")
 
+    # Обновляем размер фонового изображения
+    global background_photo
+    resized_background = background_image.resize((event.width, event.height), Image.LANCZOS)
+    background_photo = ImageTk.PhotoImage(resized_background)
+
     draw_road()
     draw_crosswalk()
     draw_traffic_lights()
@@ -518,6 +530,8 @@ def update_canvas(event):
         load_pedestrian_models(canvas)
 
     # Устанавливаем порядок слоев
+    canvas.tag_raise("background")
+    canvas.tag_raise("road")
     canvas.tag_raise("stop_line")
     canvas.tag_raise("crosswalk")
     canvas.tag_raise("pedestrian")
