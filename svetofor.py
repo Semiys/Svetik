@@ -9,7 +9,7 @@ import pygame  # Добавляем импорт pygame для работы со
 pygame.mixer.init()
 
 # Загрузка звукового файла
-sound = pygame.mixer.Sound("sound.mp3")
+sound = pygame.mixer.Sound("assets/sound/sound.mp3")
 sound.set_volume(0.1)  # Устанавливаем уровень громкости на 30%
 
 # Создаем главное окно
@@ -55,7 +55,7 @@ max_pedestrians = 7  # Максимальное количество пешех�
 
 # Загрузка изображений машин
 for i in range(1, 5):  # Увеличим количество изображений машин
-    image = Image.open(f"car{i}.png")
+    image = Image.open(f"assets/cars/car{i}.png")
     image = image.resize((200, 100), Image.LANCZOS)
     car_images.append(ImageTk.PhotoImage(image))
     flipped_image = image.transpose(Image.FLIP_LEFT_RIGHT)
@@ -189,7 +189,7 @@ class Pedestrian:
 def load_pedestrian_models(canvas):
     global pedestrians, last_pedestrian_spawn_time
     pedestrians = []  # Очищаем список пешеходов перед загрузкой новых
-    models = ["model1.png", "model2.png", "model3.png"]
+    models = ["assets/people/model1.png", "assets/people/model2.png", "assets/people/model3.png"]
     crosswalk_start = canvas.winfo_width() // 2 - 130
     crosswalk_end = canvas.winfo_width() // 2 + 150
     crosswalk_width = crosswalk_end - crosswalk_start
@@ -328,7 +328,7 @@ canvas = tk.Canvas(main_frame, bg="white")
 canvas.pack(side="right", fill="both", expand=True)
 
 # Загрузка фонового изображения
-background_image = Image.open("fon.png")
+background_image = Image.open("assets/bg/fon.png")
 background_photo = ImageTk.PhotoImage(background_image)
 
 
@@ -590,7 +590,7 @@ def spawn_pedestrians():
         canvas_width = canvas.winfo_width()
         canvas_height = canvas.winfo_height()
 
-        models = ["model1.png", "model2.png", "model3.png"]
+        models = ["assets/people/model1.png", "assets/people/model2.png", "assets/people/model3.png"]
         crosswalk_start = canvas_width // 2 - 130
         crosswalk_end = canvas_width // 2 + 150
 
